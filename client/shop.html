@@ -1,0 +1,64 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LUMORA | Shop Everything</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header id="site-header"></header>
+
+    <main>
+      <section class="page-hero">
+        <div class="hero-panel">
+          <div>
+            <p class="eyebrow">Shop everything</p>
+            <h1>Shop <em>Everything</em></h1>
+          </div>
+          <div class="orb">âœ¦</div>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <div class="filter-group">
+          <button class="filter-chip active" data-category="All">All</button>
+          <button class="filter-chip" data-category="Women">Women</button>
+          <button class="filter-chip" data-category="Men">Men</button>
+          <button class="filter-chip" data-category="Kids">Kids</button>
+          <button class="filter-chip" data-category="Sarees">Sarees</button>
+          <button class="filter-chip" data-category="Kurthas">Kurthas</button>
+          <button class="filter-chip" data-category="Jeans">Jeans</button>
+          <button class="filter-chip" data-category="Western">Western</button>
+        </div>
+        <div class="filter-group">
+          <input id="search-input" type="search" placeholder="Search products" aria-label="Search products" class="sort-select" />
+          <select id="filter-category" class="sort-select" style="display:none;">
+            <option value="All">All</option>
+            <option value="Women">Women</option>
+            <option value="Men">Men</option>
+            <option value="Kids">Kids</option>
+            <option value="Sarees">Sarees</option>
+            <option value="Kurthas">Kurthas</option>
+            <option value="Jeans">Jeans</option>
+            <option value="Western">Western</option>
+          </select>
+          <select id="sort-select" class="sort-select">
+            <option value="featured">Sort: Featured</option>
+            <option value="low">Price: Low to high</option>
+            <option value="high">Price: High to low</option>
+            <option value="rating">Rating</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="product-list-wrap">
+        <div id="product-grid" class="product-grid"></div>
+      </div>
+    </main>
+
+    <footer id="site-footer"></footer>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
+

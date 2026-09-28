@@ -1,0 +1,127 @@
+{
+  "info": {
+    "name": "Mini E-commerce API - 17 endpoint pass",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api" },
+    { "key": "userToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "testEmail", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "cartItemId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "1 Register",
+          "event": [{ "listen": "prerequest", "script": { "exec": ["pm.environment.set('testEmail', `postman-${Date.now()}@example.com`);"] } }, { "listen": "test", "script": { "exec": ["pm.test('Register returns 201', () => pm.response.to.have.status(201));", "pm.environment.set('userToken', pm.response.json().token);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"secret123\"\n}" }, "url": "{{baseUrl}}/auth/register" }
+        },
+        {
+          "name": "2 Login",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"secret123\"\n}" }, "url": "{{baseUrl}}/auth/login" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Login returns 200', () => pm.response.to.have.status(200));", "pm.environment.set('userToken', pm.response.json().token);"] } }]
+        },
+        {
+          "name": "3 Me",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }], "url": "{{baseUrl}}/auth/me" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Me returns 200', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('email');"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "4 Create product (admin)",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Product\",\n  \"description\": \"Created by the API pass\",\n  \"price\": 29.99,\n  \"category\": \"accessories\",\n  \"stock\": 10,\n  \"imageUrl\": \"\"\n}" }, "url": "{{baseUrl}}/products" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Create product returns 201', () => pm.response.to.have.status(201));", "pm.environment.set('productId', pm.response.json()._id);"] } }]
+        },
+        {
+          "name": "5 List products",
+          "request": { "method": "GET", "url": "{{baseUrl}}/products?page=1&limit=10" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('List products returns 200', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('products');"] } }]
+        },
+        {
+          "name": "6 Get product",
+          "request": { "method": "GET", "url": "{{baseUrl}}/products/{{productId}}" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Get product returns 200', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "7 Search products",
+          "request": { "method": "GET", "url": "{{baseUrl}}/products/search?q=Postman" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Search products returns 200', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.be.an('array');"] } }]
+        },
+        {
+          "name": "8 Update product (admin)",
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"price\": 34.99,\n  \"stock\": 8\n}" }, "url": "{{baseUrl}}/products/{{productId}}" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Update product returns 200', () => pm.response.to.have.status(200));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "9 Create order",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"items\": [{ \"product\": \"{{productId}}\", \"qty\": 1 }]\n}" }, "url": "{{baseUrl}}/orders" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Create order returns 201', () => pm.response.to.have.status(201));", "pm.environment.set('orderId', pm.response.json()._id);"] } }]
+        },
+        {
+          "name": "10 List orders",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }], "url": "{{baseUrl}}/orders?page=1&limit=10" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('List orders returns 200', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('orders');"] } }]
+        },
+        {
+          "name": "11 Get order",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }], "url": "{{baseUrl}}/orders/{{orderId}}" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Get order returns 200', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "12 Update order status (admin)",
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"status\": \"shipped\" }" }, "url": "{{baseUrl}}/orders/{{orderId}}" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Update order returns 200', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "13 Cancel order",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }], "url": "{{baseUrl}}/orders/{{orderId}}" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Cancel order returns 200', () => pm.response.to.have.status(200));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "14 View cart",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }], "url": "{{baseUrl}}/cart" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('View cart returns 200', () => pm.response.to.have.status(200));", "const items = pm.response.json().items;", "if (items.length) pm.environment.set('cartItemId', items[0]._id);"] } }]
+        },
+        {
+          "name": "15 Add cart item",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"qty\": 1\n}" }, "url": "{{baseUrl}}/cart" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Add cart item returns 200', () => pm.response.to.have.status(200));", "pm.environment.set('cartItemId', pm.response.json().items[0]._id);"] } }]
+        },
+        {
+          "name": "16 Remove cart item",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }], "url": "{{baseUrl}}/cart/{{cartItemId}}" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Remove cart item returns 200', () => pm.response.to.have.status(200));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Product cleanup",
+      "item": [
+        {
+          "name": "17 Delete product (admin)",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/products/{{productId}}" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Delete product returns 200', () => pm.response.to.have.status(200));"] } }]
+        }
+      ]
+    }
+  ]
+}
