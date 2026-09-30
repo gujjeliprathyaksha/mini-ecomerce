@@ -19,16 +19,7 @@ const allowedOrigins = new Set([
   'http://localhost:3000',
 ].filter(Boolean));
 
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-}));
+app.use(cors());
 app.use(express.json());
 
 app.get('/api/health', (_request, response) => {
