@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import Cart from '../models/Cart.js';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 
@@ -29,19 +30,48 @@ function normalizeTrackingLocation(value) {
 
 function handleDatabaseError(response, error, fallbackMessage) {
   if (error.name === 'ValidationError' || error.name === 'CastError') {
-    return response.status(400).json({ message: 'Invalid order data' });
+    return response.status(400).json({ message: error.message });
   }
-  return response.status(500).json({ message: fallbackMessage });
+  return response.status(500).json({ message: error.message || fallbackMessage });
 }
 
 export async function createOrder(request, response) {
-  const { items, deliveryAddress, paymentMethod } = request.body;
+  const {
+    items,
+    deliveryAddress,
+    paymentMethod,
+    subtotal: submittedSubtotal,
+    gstAmount: submittedGstAmount,
+    totalAmount: submittedTotal,
+  } = request.body || {};
   if (!Array.isArray(items) || items.length === 0) {
     return response.status(400).json({ message: 'At least one order item is required' });
   }
   const paymentOptions = ['UPI', 'Credit Card', 'Debit Card', 'Net Banking', 'Cash on Delivery'];
-  if (paymentMethod && !paymentOptions.includes(paymentMethod)) {
-    return response.status(400).json({ message: 'Invalid payment method' });
+  if (!paymentOptions.includes(paymentMethod)) {
+    return response.status(400).json({ message: 'Choose a valid payment method' });
+  }
+
+  const addressFields = ['name', 'phone', 'house', 'street', 'city', 'state', 'pincode'];
+  if (!deliveryAddress || typeof deliveryAddress !== 'object' || Array.isArray(deliveryAddress)) {
+    return response.status(400).json({ message: 'A deliveryAddress object is required' });
+  }
+  const normalizedAddress = {};
+  for (const field of addressFields) {
+    const value = deliveryAddress[field];
+    if (typeof value !== 'string' || !value.trim()) {
+      return response.status(400).json({ message: `Delivery address ${field} is required` });
+    }
+    normalizedAddress[field] = value.trim();
+  }
+  if (!/^[0-9]{10}$/.test(normalizedAddress.phone)) {
+    return response.status(400).json({ message: 'Phone number must contain exactly 10 digits' });
+  }
+  if (!/^[0-9]{6}$/.test(normalizedAddress.pincode)) {
+    return response.status(400).json({ message: 'PIN code must contain exactly 6 digits' });
+  }
+  if (![submittedSubtotal, submittedGstAmount, submittedTotal].every((amount) => Number.isFinite(amount) && amount >= 0)) {
+    return response.status(400).json({ message: 'Valid subtotal, gstAmount and totalAmount values are required' });
   }
 
   const quantities = new Map();
@@ -71,18 +101,26 @@ export async function createOrder(request, response) {
       qty,
       price: productsById.get(productId).price,
     }));
-    const totalAmount = orderItems.reduce((total, item) => total + item.price * item.qty, 0);
+    const subtotal = orderItems.reduce((total, item) => total + item.price * item.qty, 0);
+    const gstAmount = Math.round(subtotal * 0.18);
+    const totalAmount = subtotal + gstAmount;
+    if (submittedSubtotal !== subtotal || submittedGstAmount !== gstAmount || submittedTotal !== totalAmount) {
+      return response.status(409).json({ message: 'The order total changed. Review your cart and try again.' });
+    }
     const expectedDeliveryAt = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000);
     const order = await Order.create({
       user: request.user._id,
       items: orderItems,
+      subtotal,
+      gstAmount,
       totalAmount,
-      deliveryAddress,
-      paymentMethod: paymentMethod || 'UPI',
+      deliveryAddress: normalizedAddress,
+      paymentMethod,
       expectedDeliveryAt,
       currentLocation: statusLocations.pending,
     });
 
+    await Cart.findOneAndUpdate({ user: request.user._id }, { $set: { items: [] } });
     return response.status(201).json(await order.populate('items.product'));
   } catch (error) {
     return handleDatabaseError(response, error, 'Unable to create order');

@@ -76,6 +76,11 @@ export function CartProvider({ children }) {
     setCart(data);
   }
 
+  function clearCart() {
+    setLocalItems([]);
+    setCart({ items: [] });
+  }
+
   const itemCount = cart.items.reduce((total, item) => total + item.qty, 0);
   const subtotal = cart.items.reduce(
     (total, item) => total + (item.product?.price || 0) * item.qty,
@@ -83,7 +88,7 @@ export function CartProvider({ children }) {
   );
 
   return (
-    <CartContext.Provider value={{ cart, loading, itemCount, subtotal, refreshCart, addItem, removeItem, updateItemQuantity }}>
+    <CartContext.Provider value={{ cart, loading, itemCount, subtotal, refreshCart, addItem, removeItem, updateItemQuantity, clearCart }}>
       {children}
     </CartContext.Provider>
   );

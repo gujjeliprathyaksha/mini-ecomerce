@@ -16,7 +16,7 @@ const productPath = (product) => product?.department === 'Beauty'
     : `/products/${product?._id}`;
 
 export default function BeautyCheckout() {
-  const { cart, removeItem, updateItemQuantity } = useCart();
+  const { cart, removeItem, updateItemQuantity, clearCart } = useCart();
   const { user } = useAuth();
   const [address, setAddress] = useState({ name: '', phone: '', house: '', street: '', city: '', state: '', pincode: '' });
   const [paymentMethod, setPaymentMethod] = useState('UPI');
@@ -57,52 +57,66 @@ export default function BeautyCheckout() {
 
   async function placeOrder(event) {
     event.preventDefault();
+    if (!user) {
+      setError('Sign in to place an order.');
+      return;
+    }
+
     setWorking(true);
     setError('');
     try {
       const serverItems = cart.items.filter((item) => objectIdPattern.test(item.product?._id || ''));
-      let savedOrder = null;
-      if (user && serverItems.length === cart.items.length) {
-        const { data } = await api.post('/orders', {
-          items: serverItems.map((item) => ({ product: item.product._id, qty: item.qty })),
-          deliveryAddress: address,
-          paymentMethod,
-        });
-        savedOrder = data;
+      if (serverItems.length !== cart.items.length) {
+        throw new Error('One or more products are unavailable for checkout. Remove them and add products from the catalog.');
       }
-      const expectedDelivery = savedOrder?.expectedDeliveryAt || new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString();
-      const trackingNumber = savedOrder?.trackingNumber || `LMR-${Math.random().toString(36).slice(2, 12).toUpperCase()}`;
-      const nextOrder = {
-        id: savedOrder?._id || `LUM-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-        trackingNumber,
-        status: savedOrder?.status || 'pending',
-        currentLocation: savedOrder?.currentLocation || 'Lumora Fulfillment Center',
-        items: cart.items.map((item) => ({ product: item.product, qty: item.qty })),
-        address,
-        paymentMethod,
+      const deliveryAddress = Object.fromEntries(
+        Object.entries(address).map(([field, value]) => [field, value.trim()]),
+      );
+      const { data: savedOrder } = await api.post('/orders', {
+        items: serverItems.map((item) => ({ product: item.product._id, qty: item.qty })),
         subtotal,
+        gstAmount: gst,
+        totalAmount: total,
+        deliveryAddress,
+        paymentMethod,
+      });
+      const expectedDelivery = savedOrder.expectedDeliveryAt;
+      const nextOrder = {
+        id: savedOrder._id,
+        trackingNumber: savedOrder.trackingNumber,
+        status: savedOrder.status,
+        currentLocation: savedOrder.currentLocation,
+        items: savedOrder.items,
+        address: savedOrder.deliveryAddress,
+        paymentMethod: savedOrder.paymentMethod,
+        subtotal: savedOrder.subtotal,
         savings,
-        gst,
-        total,
+        gst: savedOrder.gstAmount,
+        total: savedOrder.totalAmount,
         expectedDelivery,
       };
-      localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(nextOrder));
-      const history = JSON.parse(localStorage.getItem(ORDER_HISTORY_KEY) || '[]');
-      history.push({
-        orderId: nextOrder.id,
-        trackingNumber,
-        status: nextOrder.status,
-        currentLocation: nextOrder.currentLocation,
-        expectedDeliveryAt: expectedDelivery,
-        createdAt: savedOrder?.createdAt || new Date().toISOString(),
-        deliveryAddress: address,
-        items: nextOrder.items,
-      });
-      localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(history.slice(-25)));
-      for (const item of cart.items) await removeItem(item._id);
+      clearCart();
       setOrder(nextOrder);
+      try {
+        localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(nextOrder));
+        const history = JSON.parse(localStorage.getItem(ORDER_HISTORY_KEY) || '[]');
+        history.push({
+          orderId: nextOrder.id,
+          trackingNumber: nextOrder.trackingNumber,
+          status: nextOrder.status,
+          currentLocation: nextOrder.currentLocation,
+          expectedDeliveryAt: expectedDelivery,
+          createdAt: savedOrder.createdAt,
+          deliveryAddress: savedOrder.deliveryAddress,
+          totalAmount: savedOrder.totalAmount,
+          items: nextOrder.items,
+        });
+        localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(history.slice(-25)));
+      } catch {
+        // The persisted account order remains available from the Orders page.
+      }
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Checkout could not be completed. Please try again.');
+      setError(requestError.response?.data?.message || requestError.message || 'Checkout could not be completed. Please try again.');
     } finally {
       setWorking(false);
     }
@@ -112,11 +126,11 @@ export default function BeautyCheckout() {
     setAddress((current) => ({ ...current, [event.target.name]: event.target.value }));
   }
 
-  if (order) return <section className="beauty-checkout-page"><div className="beauty-order-success"><span>✓</span><p className="beauty-kicker">LUMORA ORDER</p><h1>Order Placed Successfully</h1><p>Your order is being prepared for delivery.</p><div className="beauty-order-meta"><div><small>ORDER ID</small><strong>{order.id}</strong></div><div><small>TRACKING NUMBER</small><strong>{order.trackingNumber}</strong></div><div><small>EXPECTED DELIVERY</small><strong>{new Date(order.expectedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></div></div><div className="beauty-order-items">{order.items.map(({ product, qty }) => <div key={product._id || product.id}><span>{product.name} × {qty}</span><strong>{money(product.price * qty)}</strong></div>)}</div><div className="beauty-order-address"><strong>Delivering to</strong><p>{order.address.name} · {order.address.phone}<br />{order.address.house}, {order.address.street}<br />{order.address.city}, {order.address.state} {order.address.pincode}</p><span>Payment: {order.paymentMethod}</span></div><strong className="beauty-order-total">Total paid: {money(order.total)}</strong><div className="beauty-order-actions"><Link className="beauty-add" to="/track-order">Track order</Link><Link className="beauty-buy" to="/">Continue shopping</Link></div></div></section>;
+  if (order) return <section className="beauty-checkout-page"><div className="beauty-order-success"><span>✓</span><p className="beauty-kicker">LUMORA ORDER</p><h1>Order Placed Successfully!</h1><p>Your order is being prepared for delivery.</p><div className="beauty-order-meta"><div><small>ORDER ID</small><strong>{order.id}</strong></div><div><small>TRACKING NUMBER</small><strong>{order.trackingNumber}</strong></div><div><small>EXPECTED DELIVERY</small><strong>{new Date(order.expectedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></div></div><div className="beauty-order-items">{order.items.map(({ product, qty }) => <div key={product._id || product.id}><span>{product.name} × {qty}</span><strong>{money(product.price * qty)}</strong></div>)}</div><div className="beauty-order-address"><strong>Delivering to</strong><p>{order.address.name} · {order.address.phone}<br />{order.address.house}, {order.address.street}<br />{order.address.city}, {order.address.state} {order.address.pincode}</p><span>Payment: {order.paymentMethod}</span></div><strong className="beauty-order-total">Total paid: {money(order.total)}</strong><div className="beauty-order-actions"><Link className="beauty-add" to="/track-order">Track order</Link><Link className="beauty-buy" to="/">Continue shopping</Link></div></div></section>;
 
   if (!cart.items.length) return <section className="beauty-checkout-page"><div className="beauty-empty">Your bag is empty. <Link to="/">Explore the store</Link></div></section>;
 
-  return <section className="beauty-checkout-page"><header className="beauty-checkout-heading"><div><Link className="beauty-breadcrumb" to={isBeautyCart ? '/beauty' : '/'}>{isBeautyCart ? 'Beauty /' : 'Shop /'}</Link><p className="beauty-kicker">YOUR SELECTED EDIT</p><h1>Shopping bag</h1></div><span>{cart.items.reduce((count, item) => count + item.qty, 0)} items</span></header>{error && <p className="beauty-checkout-error" role="alert">{error}</p>}<form className="beauty-checkout-layout" onSubmit={placeOrder}><div className="beauty-bag-list"><h2>Your items</h2>{cart.items.map((item) => {
+  return <section className="beauty-checkout-page"><header className="beauty-checkout-heading"><div><Link className="beauty-breadcrumb" to={isBeautyCart ? '/beauty' : '/'}>{isBeautyCart ? 'Beauty /' : 'Shop /'}</Link><p className="beauty-kicker">YOUR SELECTED EDIT</p><h1>Shopping bag</h1></div><span>{cart.items.reduce((count, item) => count + item.qty, 0)} items</span></header>{error && <p className="beauty-checkout-error" role="alert">{error}{!user && <> <Link to="/login">Sign in</Link></>}</p>}<form className="beauty-checkout-layout" onSubmit={placeOrder}><div className="beauty-bag-list"><h2>Your items</h2>{cart.items.map((item) => {
     const product = item.product || {};
     const inStock = Number(product.stock || 0) > 0;
     return <article className="beauty-bag-item" key={item._id}><Link to={productPath(product)}><img src={product.imageUrl || product.images?.[0]} alt={product.name || 'Product'} /></Link><div className="beauty-bag-copy"><span className="beauty-brand">{product.brand || product.category || 'LUMORA'}</span><Link to={productPath(product)}>{product.name || 'Unavailable product'}</Link><span>{inStock ? `${product.stock} available` : 'Stock status unavailable'}</span><div className="beauty-quantity"><button type="button" aria-label={`Decrease ${product.name} quantity`} disabled={item.qty <= 1} onClick={() => changeQuantity(item, item.qty - 1)}>−</button><strong>{item.qty}</strong><button type="button" aria-label={`Increase ${product.name} quantity`} disabled={inStock && item.qty >= product.stock} onClick={() => changeQuantity(item, item.qty + 1)}>+</button><button type="button" className="beauty-move-wishlist" onClick={() => moveToWishlist(item)}>Move to wishlist</button><button type="button" className="beauty-remove" onClick={() => removeItem(item._id)}>Remove</button></div></div><strong className="beauty-bag-price">{money(product.price * item.qty)}</strong></article>;

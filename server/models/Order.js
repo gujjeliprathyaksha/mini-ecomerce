@@ -46,6 +46,16 @@ const orderSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    subtotal: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    gstAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     trackingNumber: {
       type: String,
       unique: true,
@@ -59,18 +69,18 @@ const orderSchema = new mongoose.Schema(
       default: 'Lumora Fulfillment Center',
     },
     deliveryAddress: {
-      name: { type: String, trim: true, default: '' },
-      phone: { type: String, trim: true, default: '' },
-      house: { type: String, trim: true, default: '' },
-      street: { type: String, trim: true, default: '' },
-      city: { type: String, trim: true, default: '' },
-      state: { type: String, trim: true, default: '' },
-      pincode: { type: String, trim: true, default: '' },
+      name: { type: String, trim: true, required: true },
+      phone: { type: String, trim: true, required: true, match: /^[0-9]{10}$/ },
+      house: { type: String, trim: true, required: true },
+      street: { type: String, trim: true, required: true },
+      city: { type: String, trim: true, required: true },
+      state: { type: String, trim: true, required: true },
+      pincode: { type: String, trim: true, required: true, match: /^[0-9]{6}$/ },
     },
     paymentMethod: {
       type: String,
+      required: true,
       enum: ['UPI', 'Credit Card', 'Debit Card', 'Net Banking', 'Cash on Delivery'],
-      default: 'UPI',
     },
     expectedDeliveryAt: {
       type: Date,
